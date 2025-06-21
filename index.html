@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Viaje con Manuel</title>
+  <title>Caza San Martín</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
     body {
@@ -21,21 +21,25 @@
   </style>
 </head>
 <body>
-  <h1>Viaje con Manuel</h1>
+  <h1>Caza San Martín</h1>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    const airtableToken = "patiRwUAYSPhDFA6v.4860e76fce11ae963cf71189508da6ff87c3c2a8b82782b802eb20e1f04a2296";
-    const baseId = "appo1MtSst3hKF0ky";
-    const tableName = "Puntos"; // Nombre de la tabla
+    // Reemplaza con tu propia API Key de Airtable
+    const airtableToken = "tu_api_key_aqui";  // API Key de Airtable
+    // Reemplaza con el Base ID de tu base de datos en Airtable
+    const baseId = "tu_base_id_aqui";  // Base ID de la base "lugares"
+    const tableName = "Caza";  // Nombre de la nueva tabla
 
-    const map = L.map('map').setView([39.5696, 2.6502], 13); // Centro Palma
+    // Configuración del mapa de Leaflet
+    const map = L.map('map').setView([39.5696, 2.6502], 13); // Centro Palma, puedes modificar la latitud y longitud según tu zona
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
+    // Función para cargar los puntos desde Airtable
     async function cargarPuntos() {
       const url = `https://api.airtable.com/v0/${baseId}/${tableName}`;
       const headers = {
@@ -46,6 +50,7 @@
         const res = await fetch(url, { headers });
         const data = await res.json();
 
+        // Mostrar los puntos en el mapa
         data.records.forEach(record => {
           const nombre = record.fields.Nombre || 'Sin nombre';
           const direccion = record.fields.Direccion || 'Sin dirección';
@@ -53,6 +58,7 @@
           const lng = record.fields.Longitud;
           let check = record.fields.CheckIn || false;
 
+          // Verifica si las coordenadas están disponibles
           if (lat && lng) {
             const icon = L.circleMarker([lat, lng], {
               radius: 12,
@@ -70,6 +76,7 @@
             actualizarPopup();
             icon.addTo(map);
 
+            // Evento al hacer click sobre un punto
             icon.on('click', async () => {
               check = !check;
               icon.setStyle({
@@ -80,6 +87,7 @@
               actualizarPopup();
               icon.openPopup();
 
+              // Actualiza el estado del Check-in en Airtable
               await fetch(`${url}/${record.id}`, {
                 method: 'PATCH',
                 headers: {
@@ -100,8 +108,49 @@
       }
     }
 
+    // Cargar los puntos al inicio
     cargarPuntos();
+
+    // Función para agregar puntos al hacer clic en el mapa
+    map.on('click', async function(e) {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+
+      // Mostrar un popup para añadir nombre y dirección
+      const nombre = prompt('Ingrese el nombre del punto:');
+      const direccion = prompt('Ingrese la dirección del punto:');
+
+      if (nombre && direccion) {
+        const newRecord = {
+          fields: {
+            Nombre: nombre,
+            Direccion: direccion,
+            Latitud: lat,
+            Longitud: lng,
+            CheckIn: false  // Inicialmente no ha hecho check-in
+          }
+        };
+
+        // Crear un nuevo registro en la tabla "Caza" de Airtable
+        try {
+          await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${airtableToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(newRecord)
+          });
+
+          alert('Nuevo punto añadido exitosamente');
+          cargarPuntos();  // Recargar los puntos
+        } catch (error) {
+          console.error('Error al añadir el nuevo punto:', error);
+        }
+      } else {
+        alert('Debe ingresar un nombre y una dirección.');
+      }
+    });
   </script>
 </body>
 </html>
-
