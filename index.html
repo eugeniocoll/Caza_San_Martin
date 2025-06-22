@@ -15,6 +15,7 @@
       margin: 10px 0;
       z-index: 1200;
       position: relative;
+      display: none; /* Oculto por defecto */
     }
     #url-maps {
       width: 80%;
@@ -39,14 +40,32 @@
       border-radius: 6px; cursor: pointer;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
+    #btn-show-input {
+      display: block;
+      margin: 10px auto;
+      width: 160px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      font-weight: bold;
+    }
+    #btn-close-input {
+      background-color: #f44336;
+      color: white;
+      border: none;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
   <h1>Caza San Martin</h1>
 
+  <button id="btn-show-input" onclick="mostrarInput()">Añadir link</button>
+
   <div id="input-container">
     <input type="text" id="url-maps" placeholder="Pega aquí la URL larga de Google Maps" />
-    <button onclick="añadirLink()">Añadir link</button>
+    <button onclick="añadirLink()">Añadir</button>
+    <button id="btn-close-input" onclick="ocultarInput()">Cerrar</button>
   </div>
 
   <button onclick="centrarEnPosicionActual()" class="gps-button" id="btn-gps">📍 Mi ubicación</button>
@@ -71,14 +90,24 @@
       }).addTo(map).bindTooltip("Estás aquí").openTooltip();
     }
 
-    // Extrae coordenadas de URL larga de Google Maps (@lat,lng)
+    function mostrarInput() {
+      document.getElementById('input-container').style.display = 'block';
+      document.getElementById('btn-show-input').style.display = 'none';
+      document.getElementById('url-maps').focus();
+    }
+
+    function ocultarInput() {
+      document.getElementById('input-container').style.display = 'none';
+      document.getElementById('btn-show-input').style.display = 'block';
+      document.getElementById('url-maps').value = '';
+    }
+
     function extraerCoordenadasDeUrl(url) {
       const match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
       if (!match) return null;
       return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
     }
 
-    // Función para añadir marcador al mapa con coordenadas extraídas
     function añadirLink() {
       const url = document.getElementById('url-maps').value.trim();
       if (!url) {
@@ -92,15 +121,15 @@
         return;
       }
 
-      // Añade o actualiza marcador
       if (marcadorLink) {
         map.removeLayer(marcadorLink);
       }
       marcadorLink = L.marker([coords.lat, coords.lng]).addTo(map)
         .bindPopup("Ubicación añadida desde el link").openPopup();
 
-      // Centrar el mapa en el marcador nuevo
       map.setView([coords.lat, coords.lng], 16);
+
+      ocultarInput();
     }
 
     function centrarEnPosicionActual() {
@@ -123,10 +152,9 @@
       );
     }
 
-    // Al cargar la página intento iniciar mapa en posición actual o fallback a Madrid
     navigator.geolocation.getCurrentPosition(
       pos => iniciarMapa(pos.coords.latitude, pos.coords.longitude),
-      () => iniciarMapa(40.4168, -3.7038), // fallback Madrid
+      () => iniciarMapa(40.4168, -3.7038),
       { enableHighAccuracy: true }
     );
   </script>
