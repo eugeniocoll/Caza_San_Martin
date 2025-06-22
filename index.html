@@ -2,16 +2,39 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Caza San Martin</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <style>
     body { margin: 0; font-family: Arial, sans-serif; }
     h1 { text-align: center; margin: 10px; position: relative; z-index: 1100; }
-    #map { width: 100%; height: 90vh; }
+    #map { width: 100%; height: 80vh; }
+    #input-container {
+      text-align: center;
+      margin: 10px 0;
+      z-index: 1200;
+      position: relative;
+    }
+    #url-maps {
+      width: 80%;
+      padding: 8px;
+      font-size: 16px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 9px 15px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 4px;
+      border: 1px solid #666;
+      background-color: #eee;
+      margin-left: 6px;
+    }
     .gps-button {
       position: absolute; z-index: 1000;
+      bottom: 20px; right: 20px;
       padding: 10px 12px; background: white; border: 1px solid #ccc;
       border-radius: 6px; cursor: pointer;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
@@ -25,12 +48,17 @@
 </head>
 <body>
   <h1>Caza San Martin</h1>
-  <button onclick="centrarEnPosicionActual()" class="gps-button" style="bottom: 20px; right: 20px;">📍 Mi ubicación</button>
-  <button onclick="pegarUbicacionDesdeEnlace()" class="gps-button" style="bottom: 70px; right: 20px;">📎 Pegar ubicación</button>
+
+  <div id="input-container">
+    <input type="text" id="url-maps" placeholder="Pega aquí la URL larga de Google Maps" />
+    <button onclick="usarUrlMaps()">Mostrar en el mapa</button>
+  </div>
+
+  <button onclick="centrarEnPosicionActual()" class="gps-button">📍 Mi ubicación</button>
   <div id="map"></div>
 
-  <script defer src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script defer src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
   <script>
     const airtableToken = "patiRwUAYSPhDFA6v.4860e76fce11ae963cf71189508da6ff87c3c2a8b82782b802eb20e1f04a2296";
@@ -38,7 +66,7 @@
     const tableName = "Caza";
 
     let map, userMarker;
-    let markers = [];
+    let marcadorUrl;
 
     function iniciarMapa(lat, lng) {
       map = L.map('map').setView([lat, lng], 14);
@@ -50,6 +78,7 @@
         radius: 8, color: 'blue', fillColor: 'blue', fillOpacity: 0.6
       }).addTo(map).bindTooltip("Estás aquí").openTooltip();
 
+      // Añadir buscador
       L.Control.geocoder({
         defaultMarkGeocode: false
       }).on('markgeocode', function(e) {
@@ -60,7 +89,7 @@
         const nombre = prompt("Nombre del punto:");
         const direccion = prompt("Dirección:");
         if (!nombre || !direccion) return;
-        guardarPunto(center.lat, center.lng, nombre, direccion).then(cargarPuntos);
+        guardarPunto(center.lat, center.lng, nombre, direccion).then(() => location.reload());
       }).addTo(map);
 
       cargarPuntos();
@@ -72,7 +101,7 @@
         const direccion = prompt("Dirección:");
         if (!nombre || !direccion) return;
         await guardarPunto(e.latlng.lat, e.latlng.lng, nombre, direccion);
-        await cargarPuntos();
+        location.reload();
       });
     }
 
@@ -97,10 +126,6 @@
     }
 
     async function cargarPuntos() {
-      // Eliminar marcadores anteriores
-      markers.forEach(m => map.removeLayer(m));
-      markers = [];
-
       const url = `https://api.airtable.com/v0/${baseId}/${tableName}`;
       const headers = { Authorization: `Bearer ${airtableToken}` };
       const res = await fetch(url, { headers });
@@ -126,7 +151,7 @@
           <button class="delete-btn" onclick="eliminarPunto('${record.id}')">Eliminar</button>
         `;
 
-        marker.bindPopup(popupHTML);
+        marker.bindPopup(popupHTML, { autoClose: false, closeOnClick: false });
         marker.on('click', async () => {
           map.setView([f.Latitud, f.Longitud], 16);
           marker.openPopup();
@@ -146,10 +171,8 @@
               body: JSON.stringify({ fields: { CheckIn: false, Persona: '' } })
             });
           }
-          await cargarPuntos();
+          location.reload();
         });
-
-        markers.push(marker);
       });
     }
 
@@ -157,8 +180,10 @@
       if (!confirm("¿Estás seguro de eliminar este punto?")) return;
       fetch(`https://api.airtable.com/v0/${baseId}/${tableName}/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${airtableToken}` }
-      }).then(cargarPuntos);
+        headers: {
+          Authorization: `Bearer ${airtableToken}`
+        }
+      }).then(() => location.reload());
     }
 
     function centrarEnPosicionActual() {
@@ -176,34 +201,29 @@
       );
     }
 
-    function pegarUbicacionDesdeEnlace() {
-      const url = prompt("Pega el enlace de Google Maps:");
-      if (!url) return;
+    // Extrae coordenadas de URL larga de Google Maps (@lat,lng)
+    function extraerCoordenadasDeUrl(url) {
+      const match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (!match) return null;
+      return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+    }
 
-      const coordMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-      if (!coordMatch) {
-        alert("No se encontraron coordenadas en el enlace.");
+    // Función para usar URL larga y poner marcador
+    function usarUrlMaps() {
+      const url = document.getElementById('url-maps').value.trim();
+      if (!url) {
+        alert("Por favor pega una URL válida de Google Maps.");
         return;
       }
 
-      const lat = parseFloat(coordMatch[1]);
-      const lng = parseFloat(coordMatch[2]);
+      const coords = extraerCoordenadasDeUrl(url);
+      if (!coords) {
+        alert("No se encontraron coordenadas en la URL. Asegúrate de pegar la URL larga que contiene '@lat,lng'.");
+        return;
+      }
 
-      map.setView([lat, lng], 16);
-      const crear = confirm("¿Crear una nueva localización aquí?");
-      if (!crear) return;
-      const nombre = prompt("Nombre del punto:");
-      const direccion = prompt("Dirección:");
-      if (!nombre || !direccion) return;
+      map.setView([coords.lat, coords.lng], 16);
 
-      guardarPunto(lat, lng, nombre, direccion).then(cargarPuntos);
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      pos => iniciarMapa(pos.coords.latitude, pos.coords.longitude),
-      () => iniciarMapa(40.4168, -3.7038), // fallback a Madrid
-      { enableHighAccuracy: true }
-    );
-  </script>
-</body>
-</html>
+      if (marcadorUrl) map.removeLayer(marcadorUrl);
+      marcadorUrl = L.marker([coords.lat, coords.lng]).addTo(map)
+        .bindPopup("Ubicación desde URL").
