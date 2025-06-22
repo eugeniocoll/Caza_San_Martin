@@ -44,14 +44,12 @@
       background-color: #218838;
     }
 
-    /* Popup delete button */
     .delete-btn {
       background-color: red; color: white; border: none;
       padding: 6px 10px; margin-top: 6px;
       cursor: pointer; border-radius: 4px;
     }
 
-    /* Barra para introducir coordenadas, inicialmente oculta */
     #coords-input-bar {
       position: absolute;
       bottom: 60px;
@@ -124,7 +122,6 @@
         radius: 8, color: 'blue', fillColor: 'blue', fillOpacity: 0.6
       }).addTo(map).bindTooltip("Estás aquí").openTooltip();
 
-      // Añadir buscador
       L.Control.geocoder({
         defaultMarkGeocode: false
       }).on('markgeocode', function(e) {
@@ -135,23 +132,31 @@
         const nombre = prompt("Nombre del punto:");
         const direccion = prompt("Dirección:");
         if (!nombre || !direccion) return;
-        guardarPunto(center.lat, center.lng, nombre, direccion).then(() => location.reload());
+        guardarPunto(center.lat, center.lng, nombre, direccion, "localizacion").then(() => location.reload());
       }).addTo(map);
 
       cargarPuntos();
 
       map.on('click', async e => {
-        const crear = confirm("¿Crear una nueva localización aquí?");
-        if (!crear) return;
-        const nombre = prompt("Nombre del punto:");
-        const direccion = prompt("Dirección:");
-        if (!nombre || !direccion) return;
-        await guardarPunto(e.latlng.lat, e.latlng.lng, nombre, direccion);
+        const opcion = prompt("¿Qué quieres añadir?\n1 - Nueva localización\n2 - Avistamiento de bichos");
+        if (!opcion) return;
+
+        if (opcion === "1") {
+          const nombre = prompt("Nombre del punto:");
+          const direccion = prompt("Dirección:");
+          if (!nombre || !direccion) return;
+          await guardarPunto(e.latlng.lat, e.latlng.lng, nombre, direccion, "localizacion");
+        } else if (opcion === "2") {
+          await guardarPunto(e.latlng.lat, e.latlng.lng, "Avistamiento", "N/A", "bicho");
+        } else {
+          alert("Opción no válida.");
+        }
+
         location.reload();
       });
     }
 
-    async function guardarPunto(lat, lng, nombre, direccion) {
+    async function guardarPunto(lat, lng, nombre, direccion, tipo = "localizacion") {
       await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}`, {
         method: 'POST',
         headers: {
@@ -165,7 +170,8 @@
             Latitud: lat,
             Longitud: lng,
             CheckIn: false,
-            Persona: ''
+            Persona: '',
+            Tipo: tipo
           }
         })
       });
@@ -181,13 +187,24 @@
         const f = record.fields;
         if (!(f.Latitud && f.Longitud)) return;
 
-        const marker = L.circleMarker([f.Latitud, f.Longitud], {
-          radius: 12,
-          color: f.CheckIn ? 'green' : 'gray',
-          fillColor: f.CheckIn ? 'green' : '#888',
-          fillOpacity: f.CheckIn ? 0.7 : 0.3,
-          weight: 3
-        }).addTo(map);
+        let marker;
+        if (f.Tipo === "bicho") {
+          const iconoCiervo = L.icon({
+            iconUrl: "https://cdn-icons-png.flaticon.com/512/616/616408.png",
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+          });
+          marker = L.marker([f.Latitud, f.Longitud], { icon: iconoCiervo }).addTo(map);
+        } else {
+          marker = L.circleMarker([f.Latitud, f.Longitud], {
+            radius: 12,
+            color: f.CheckIn ? 'green' : 'gray',
+            fillColor: f.CheckIn ? 'green' : '#888',
+            fillOpacity: f.CheckIn ? 0.7 : 0.3,
+            weight: 3
+          }).addTo(map);
+        }
 
         const popupHTML = `
           <b>${f.Nombre || 'Sin nombre'}</b><br>
@@ -199,8 +216,11 @@
 
         marker.bindPopup(popupHTML, { autoClose: false, closeOnClick: false });
         marker.on('click', async () => {
+          if (f.Tipo === "bicho") return;
+
           map.setView([f.Latitud, f.Longitud], 16);
           marker.openPopup();
+
           if (!f.CheckIn) {
             const p = prompt("Tu nombre para hacer check-in:");
             if (!p) return;
@@ -217,6 +237,7 @@
               body: JSON.stringify({ fields: { CheckIn: false, Persona: '' } })
             });
           }
+
           location.reload();
         });
       });
@@ -247,17 +268,11 @@
       );
     }
 
-    // Mostrar/ocultar la barra para introducir coordenadas
     function toggleCoordsInput() {
       const bar = document.getElementById('coords-input-bar');
-      if (bar.style.display === 'none' || bar.style.display === '') {
-        bar.style.display = 'block';
-      } else {
-        bar.style.display = 'none';
-      }
+      bar.style.display = (bar.style.display === 'none' || bar.style.display === '') ? 'block' : 'none';
     }
 
-    // Añadir coordenadas al mapa y guardar en Airtable
     async function añadirCoordenadas() {
       const lat = parseFloat(document.getElementById('lat-input').value);
       const lng = parseFloat(document.getElementById('lng-input').value);
@@ -271,13 +286,13 @@
       const direccion = prompt("Dirección:");
       if (!direccion) return;
 
-      await guardarPunto(lat, lng, nombre, direccion);
+      await guardarPunto(lat, lng, nombre, direccion, "localizacion");
       location.reload();
     }
 
     navigator.geolocation.getCurrentPosition(
       pos => iniciarMapa(pos.coords.latitude, pos.coords.longitude),
-      () => iniciarMapa(40.4168, -3.7038), // fallback a Madrid
+      () => iniciarMapa(40.4168, -3.7038),
       { enableHighAccuracy: true }
     );
   </script>
