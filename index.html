@@ -67,7 +67,8 @@
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(map);
 
-      L.circleMarker([lat, lng], {
+      // Guardamos el marcador de usuario en userMarker
+      userMarker = L.circleMarker([lat, lng], {
         radius: 8,
         color: 'blue',
         fillColor: 'blue',
@@ -120,8 +121,10 @@
           const { latitude, longitude } = position.coords;
           map.setView([latitude, longitude], 16);
 
+          // Eliminar el marcador anterior si existe
           if (userMarker) map.removeLayer(userMarker);
 
+          // Crear un nuevo marcador y actualizar userMarker
           userMarker = L.circleMarker([latitude, longitude], {
             radius: 8,
             color: 'blue',
