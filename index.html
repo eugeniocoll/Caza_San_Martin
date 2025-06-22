@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="es">
+<!DOCTYPE html>
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -44,6 +45,13 @@
       background-color: red; color: white; border: none;
       padding: 6px 10px; margin-top: 6px;
       cursor: pointer; border-radius: 4px;
+    }
+
+    .checkin-btn {
+      background-color: #007bff; color: white;
+      border: none; padding: 6px 10px;
+      margin-top: 6px; cursor: pointer;
+      border-radius: 4px;
     }
 
     #coords-input-bar {
@@ -191,13 +199,12 @@
 
         let marker;
         if (f.Tipo === 2) {
-          marker = L.marker([f.Latitud, f.Longitud], {
-            icon: L.divIcon({
-              html: '<div class="bicho-icon">🦌</div>',
-              className: 'bicho-wrapper',
-              iconAnchor: [12, 12],
-              iconSize: [12, 12]
-            })
+          marker = L.circleMarker([f.Latitud, f.Longitud], {
+            radius: 12,
+            color: 'brown',
+            fillColor: 'brown',
+            fillOpacity: 0.8,
+            weight: 3
           });
         } else {
           marker = L.circleMarker([f.Latitud, f.Longitud], {
@@ -217,32 +224,43 @@
           <b>Check-in:</b> ${f.CheckIn ? 'Sí' : 'No'}<br>
           <b>Persona:</b> ${f.Persona || 'Nadie'}<br>
           <button class="delete-btn" onclick="eliminarPunto('${record.id}')">Eliminar</button>
+          ${f.Tipo === 1 ? `<br><button class="checkin-btn" data-id="${record.id}" data-checkin="${f.CheckIn}">${f.CheckIn ? '❌ Eliminar Check-in' : '✅ Hacer Check-in'}</button>` : ''}
         `;
 
-        marker.bindPopup(popupHTML, { autoClose: false, closeOnClick: false });
+        marker.bindPopup(popupHTML);
 
-        marker.on('click', async () => {
-          map.setView([f.Latitud, f.Longitud], 16);
-          marker.openPopup();
+        marker.on('popupopen', () => {
+          const btn = document.querySelector('.checkin-btn');
+          if (btn) {
+            btn.addEventListener('click', async () => {
+              const id = btn.getAttribute('data-id');
+              const isCheckedIn = btn.getAttribute('data-checkin') === 'true';
 
-          if (f.Tipo === 1) {
-            if (!f.CheckIn) {
-              const p = prompt("Tu nombre para hacer check-in:");
-              if (!p) return;
-              await fetch(`${url}/${record.id}`, {
-                method: 'PATCH',
-                headers: { Authorization: `Bearer ${airtableToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fields: { CheckIn: true, Persona: p } })
-              });
-            } else {
-              if (!confirm("¿Eliminar check-in?")) return;
-              await fetch(`${url}/${record.id}`, {
-                method: 'PATCH',
-                headers: { Authorization: `Bearer ${airtableToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fields: { CheckIn: false, Persona: '' } })
-              });
-            }
-            location.reload();
+              if (!isCheckedIn) {
+                const p = prompt("Tu nombre para hacer check-in:");
+                if (!p) return;
+                await fetch(`${url}/${id}`, {
+                  method: 'PATCH',
+                  headers: {
+                    Authorization: `Bearer ${airtableToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ fields: { CheckIn: true, Persona: p } })
+                });
+              } else {
+                if (!confirm("¿Eliminar check-in?")) return;
+                await fetch(`${url}/${id}`, {
+                  method: 'PATCH',
+                  headers: {
+                    Authorization: `Bearer ${airtableToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ fields: { CheckIn: false, Persona: '' } })
+                });
+              }
+
+              location.reload();
+            });
           }
         });
       });
