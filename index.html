@@ -2,27 +2,44 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Caza San Martin  </title>
+  <title>Caza San Martin </title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <style>
     body { margin: 0; font-family: Arial, sans-serif; }
     h1 { text-align: center; margin: 10px; position: relative; z-index: 1100; }
-    #map { width: 100%; height: 90vh; }.gps-button, .add-coords-btn {
+    #map { width: 100%; height: 90vh; }.gps-button {
   position: absolute;
   z-index: 1000;
+  bottom: 20px;
+  right: 20px;
   padding: 10px 12px;
   background: white;
   border: 1px solid #ccc;
   border-radius: 6px;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-  font-weight: bold;
 }
 
-.gps-button { bottom: 20px; right: 20px; }
-.add-coords-btn { bottom: 20px; left: 20px; background-color: #28a745; color: white; border: none; }
-.add-coords-btn:hover { background-color: #218838; }
+.add-coords-btn {
+  position: absolute;
+  z-index: 1000;
+  bottom: 20px;
+  left: 20px;
+  padding: 10px 16px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.add-coords-btn:hover {
+  background-color: #218838;
+}
 
 .delete-btn {
   background-color: red; color: white; border: none;
@@ -60,6 +77,7 @@
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
+  transition: background-color 0.3s ease;
 }
 
 #coords-input-bar button:hover {
@@ -69,7 +87,7 @@
   </style>
 </head>
 <body>
-  <h1>Caza San Martin</h1><button onclick="centrarEnPosicionActual()" class="gps-button">📍 Mi ubicación</button> <button class="add-coords-btn" onclick="toggleCoordsInput()">➕ Añadir coordenadas</button>
+  <h1>Caza San Martín</h1><button onclick="centrarEnPosicionActual()" class="gps-button">📍 Mi ubicación</button> <button class="add-coords-btn" onclick="toggleCoordsInput()">➕ Añadir coordenadas</button>
 
   <div id="coords-input-bar">
     <input id="lat-input" type="number" step="any" placeholder="Latitud" />
@@ -92,32 +110,37 @@
         radius: 8, color: 'blue', fillColor: 'blue', fillOpacity: 0.6
       }).addTo(map).bindTooltip("Estás aquí").openTooltip();
 
-      L.Control.geocoder({ defaultMarkGeocode: false })
-        .on('markgeocode', function(e) {
-          const center = e.geocode.center;
-          map.setView(center, 16);
-          const crear = confirm("¿Crear una nueva localización aquí?");
-          if (!crear) return;
-          const tipo = confirm("¿Es una ubicación (Aceptar) o un bicho (Cancelar)?") ? 1 : 2;
-          const nombre = prompt("Nombre del punto:");
-          const direccion = prompt("Dirección:");
-          if (!nombre || !direccion) return;
-          guardarPunto(center.lat, center.lng, nombre, direccion, tipo).then(() => location.reload());
-        }).addTo(map);
+      L.Control.geocoder({
+        defaultMarkGeocode: false
+      }).on('markgeocode', function(e) {
+        const center = e.geocode.center;
+        map.setView(center, 16);
+        seleccionarTipoYGuardar(center.lat, center.lng);
+      }).addTo(map);
 
       cargarPuntos();
 
       map.on('click', async e => {
-        const tipo = confirm("¿Es una ubicación (Aceptar) o un bicho (Cancelar)?") ? 1 : 2;
-        const nombre = prompt("Nombre del punto:");
-        const direccion = prompt("Dirección:");
-        if (!nombre || !direccion) return;
-        await guardarPunto(e.latlng.lat, e.latlng.lng, nombre, direccion, tipo);
-        location.reload();
+        seleccionarTipoYGuardar(e.latlng.lat, e.latlng.lng);
       });
     }
 
-    async function guardarPunto(lat, lng, nombre, direccion, tipo, persona = '') {
+    async function seleccionarTipoYGuardar(lat, lng) {
+      const tipo = prompt("¿Tipo de punto?\n1 = Ubicación\n2 = Bicho");
+      if (tipo !== "1" && tipo !== "2") return;
+
+      const nombre = prompt("Nombre del punto:");
+      const direccion = prompt("Dirección:");
+      if (!nombre || !direccion) return;
+
+      const tipoNum = parseInt(tipo);
+      const checkIn = tipoNum === 2;
+
+      await guardarPunto(lat, lng, nombre, direccion, tipoNum, checkIn);
+      location.reload();
+    }
+
+    async function guardarPunto(lat, lng, nombre, direccion, tipo, checkIn) {
       await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}`, {
         method: 'POST',
         headers: {
@@ -130,9 +153,9 @@
             Direccion: direccion,
             Latitud: lat,
             Longitud: lng,
-            CheckIn: tipo === 2,
-            Persona: tipo === 2 ? (persona || 'Detectado') : '',
-            Tipo: tipo
+            Tipo: tipo,
+            CheckIn: checkIn,
+            Persona: checkIn ? 'Automático' : ''
           }
         })
       });
@@ -148,17 +171,24 @@
         const f = record.fields;
         if (!(f.Latitud && f.Longitud)) return;
 
-        const marker = f.Tipo === 2
-          ? L.marker([f.Latitud, f.Longitud], {
-              icon: L.divIcon({ html: "🦌", className: '', iconSize: [24, 24] })
+        let marker;
+        if (f.Tipo === 2) {
+          marker = L.marker([f.Latitud, f.Longitud], {
+            icon: L.divIcon({
+              html: '🦌',
+              className: '',
+              iconSize: [32, 32]
             })
-          : L.circleMarker([f.Latitud, f.Longitud], {
-              radius: 12,
-              color: f.CheckIn ? 'green' : 'gray',
-              fillColor: f.CheckIn ? 'green' : '#888',
-              fillOpacity: f.CheckIn ? 0.7 : 0.3,
-              weight: 3
-            });
+          });
+        } else {
+          marker = L.circleMarker([f.Latitud, f.Longitud], {
+            radius: 12,
+            color: f.CheckIn ? 'green' : 'gray',
+            fillColor: f.CheckIn ? 'green' : '#888',
+            fillOpacity: f.CheckIn ? 0.7 : 0.3,
+            weight: 3
+          });
+        }
 
         marker.addTo(map);
 
@@ -171,27 +201,30 @@
         `;
 
         marker.bindPopup(popupHTML, { autoClose: false, closeOnClick: false });
+
         marker.on('click', async () => {
           map.setView([f.Latitud, f.Longitud], 16);
           marker.openPopup();
-          if (f.Tipo === 2) return;
-          if (!f.CheckIn) {
-            const p = prompt("Tu nombre para hacer check-in:");
-            if (!p) return;
-            await fetch(`${url}/${record.id}`, {
-              method: 'PATCH',
-              headers: { Authorization: `Bearer ${airtableToken}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fields: { CheckIn: true, Persona: p } })
-            });
-          } else {
-            if (!confirm("¿Eliminar check-in?")) return;
-            await fetch(`${url}/${record.id}`, {
-              method: 'PATCH',
-              headers: { Authorization: `Bearer ${airtableToken}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fields: { CheckIn: false, Persona: '' } })
-            });
+
+          if (f.Tipo === 1) {
+            if (!f.CheckIn) {
+              const p = prompt("Tu nombre para hacer check-in:");
+              if (!p) return;
+              await fetch(`${url}/${record.id}`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${airtableToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fields: { CheckIn: true, Persona: p } })
+              });
+            } else {
+              if (!confirm("¿Eliminar check-in?")) return;
+              await fetch(`${url}/${record.id}`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${airtableToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fields: { CheckIn: false, Persona: '' } })
+              });
+            }
+            location.reload();
           }
-          location.reload();
         });
       });
     }
@@ -234,13 +267,7 @@
         alert('Por favor, introduce valores numéricos válidos para latitud y longitud.');
         return;
       }
-      const tipo = confirm("¿Es una ubicación (Aceptar) o un bicho (Cancelar)?") ? 1 : 2;
-      const nombre = prompt("Nombre del punto:");
-      const direccion = prompt("Dirección:");
-      if (!nombre || !direccion) return;
-
-      await guardarPunto(lat, lng, nombre, direccion, tipo);
-      location.reload();
+      seleccionarTipoYGuardar(lat, lng);
     }
 
     navigator.geolocation.getCurrentPosition(
