@@ -30,10 +30,22 @@
     .delete-btn:hover {
       background-color: darkred;
     }
+    .gps-button {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      padding: 10px;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
   <h1>Caza San Martin</h1>
+  <button onclick="centrarEnPosicionActual()" class="gps-button">📍 Mi ubicación</button>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -142,7 +154,6 @@
       location.reload();
     };
 
-    // ✅ MODIFICACIÓN PRINCIPAL AQUÍ
     map.on('click', async e => {
       const crear = confirm("¿Crear una nueva localización aquí?");
       if (!crear) return;
@@ -178,6 +189,35 @@
 
     function guardarVista(lat, lng) {
       localStorage.setItem('ultimaVistaMapa', JSON.stringify([lat, lng]));
+    }
+
+    function centrarEnPosicionActual() {
+      if (!navigator.geolocation) {
+        alert("Tu navegador no soporta geolocalización.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          map.setView([latitude, longitude], 16);
+          L.circleMarker([latitude, longitude], {
+            radius: 10,
+            color: 'blue',
+            fillColor: 'blue',
+            fillOpacity: 0.5
+          }).addTo(map).bindTooltip("Estás aquí").openTooltip();
+        },
+        (error) => {
+          console.error("Error obteniendo ubicación:", error);
+          alert("No se pudo obtener tu ubicación.");
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
     }
 
     cargarPuntos();
