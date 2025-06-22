@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
+<!DOCTYPE html><html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -9,105 +8,74 @@
   <style>
     body { margin: 0; font-family: Arial, sans-serif; }
     h1 { text-align: center; margin: 10px; position: relative; z-index: 1100; }
-    #map { width: 100%; height: 90vh; }
+    #map { width: 100%; height: 90vh; }.gps-button, .add-coords-btn {
+  position: absolute;
+  z-index: 1000;
+  padding: 10px 12px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  font-weight: bold;
+}
 
-    .gps-button {
-      position: absolute;
-      z-index: 1000;
-      bottom: 20px;
-      right: 20px;
-      padding: 10px 12px;
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    }
+.gps-button { bottom: 20px; right: 20px; }
+.add-coords-btn { bottom: 20px; left: 20px; background-color: #28a745; color: white; border: none; }
+.add-coords-btn:hover { background-color: #218838; }
 
-    .add-coords-btn {
-      position: absolute;
-      z-index: 1000;
-      bottom: 20px;
-      left: 20px;
-      padding: 10px 16px;
-      background-color: #28a745;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      font-weight: bold;
-      transition: background-color 0.3s ease;
-    }
+.delete-btn {
+  background-color: red; color: white; border: none;
+  padding: 6px 10px; margin-top: 6px;
+  cursor: pointer; border-radius: 4px;
+}
 
-    .add-coords-btn:hover {
-      background-color: #218838;
-    }
+#coords-input-bar {
+  position: absolute;
+  bottom: 60px;
+  left: 20px;
+  z-index: 1001;
+  background: white;
+  padding: 8px 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  display: none;
+  width: 280px;
+  font-size: 14px;
+}
 
-    /* Popup delete button */
-    .delete-btn {
-      background-color: red; color: white; border: none;
-      padding: 6px 10px; margin-top: 6px;
-      cursor: pointer; border-radius: 4px;
-    }
+#coords-input-bar input {
+  width: 100px;
+  padding: 4px 6px;
+  margin-right: 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
 
-    /* Barra para introducir coordenadas, inicialmente oculta */
-    #coords-input-bar {
-      position: absolute;
-      bottom: 60px;
-      left: 20px;
-      z-index: 1001;
-      background: white;
-      padding: 8px 10px;
-      border-radius: 6px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      display: none;
-      width: 280px;
-      font-size: 14px;
-    }
+#coords-input-bar button {
+  padding: 6px 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
 
-    #coords-input-bar input {
-      width: 100px;
-      padding: 4px 6px;
-      margin-right: 6px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
+#coords-input-bar button:hover {
+  background-color: #0056b3;
+}
 
-    #coords-input-bar button {
-      padding: 6px 10px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: background-color 0.3s ease;
-    }
-
-    #coords-input-bar button:hover {
-      background-color: #0056b3;
-    }
   </style>
 </head>
 <body>
-  <h1>Caza San Martin</h1>
-
-  <button onclick="centrarEnPosicionActual()" class="gps-button">📍 Mi ubicación</button>
-  <button class="add-coords-btn" onclick="toggleCoordsInput()">➕ Añadir coordenadas</button>
+  <h1>Caza San Martin</h1><button onclick="centrarEnPosicionActual()" class="gps-button">📍 Mi ubicación</button> <button class="add-coords-btn" onclick="toggleCoordsInput()">➕ Añadir coordenadas</button>
 
   <div id="coords-input-bar">
     <input id="lat-input" type="number" step="any" placeholder="Latitud" />
     <input id="lng-input" type="number" step="any" placeholder="Longitud" />
     <button onclick="añadirCoordenadas()">Añadir</button>
-  </div>
-
-  <div id="map"></div>
-
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-
-  <script>
+  </div>  <div id="map"></div>  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>  <script>
     const airtableToken = "patiRwUAYSPhDFA6v.4860e76fce11ae963cf71189508da6ff87c3c2a8b82782b802eb20e1f04a2296";
     const baseId = "appo1MtSst3hKF0ky";
     const tableName = "Caza";
@@ -124,34 +92,32 @@
         radius: 8, color: 'blue', fillColor: 'blue', fillOpacity: 0.6
       }).addTo(map).bindTooltip("Estás aquí").openTooltip();
 
-      // Añadir buscador
-      L.Control.geocoder({
-        defaultMarkGeocode: false
-      }).on('markgeocode', function(e) {
-        const center = e.geocode.center;
-        map.setView(center, 16);
-        const crear = confirm("¿Crear una nueva localización aquí?");
-        if (!crear) return;
-        const nombre = prompt("Nombre del punto:");
-        const direccion = prompt("Dirección:");
-        if (!nombre || !direccion) return;
-        guardarPunto(center.lat, center.lng, nombre, direccion).then(() => location.reload());
-      }).addTo(map);
+      L.Control.geocoder({ defaultMarkGeocode: false })
+        .on('markgeocode', function(e) {
+          const center = e.geocode.center;
+          map.setView(center, 16);
+          const crear = confirm("¿Crear una nueva localización aquí?");
+          if (!crear) return;
+          const tipo = confirm("¿Es una ubicación (Aceptar) o un bicho (Cancelar)?") ? 1 : 2;
+          const nombre = prompt("Nombre del punto:");
+          const direccion = prompt("Dirección:");
+          if (!nombre || !direccion) return;
+          guardarPunto(center.lat, center.lng, nombre, direccion, tipo).then(() => location.reload());
+        }).addTo(map);
 
       cargarPuntos();
 
       map.on('click', async e => {
-        const crear = confirm("¿Crear una nueva localización aquí?");
-        if (!crear) return;
+        const tipo = confirm("¿Es una ubicación (Aceptar) o un bicho (Cancelar)?") ? 1 : 2;
         const nombre = prompt("Nombre del punto:");
         const direccion = prompt("Dirección:");
         if (!nombre || !direccion) return;
-        await guardarPunto(e.latlng.lat, e.latlng.lng, nombre, direccion);
+        await guardarPunto(e.latlng.lat, e.latlng.lng, nombre, direccion, tipo);
         location.reload();
       });
     }
 
-    async function guardarPunto(lat, lng, nombre, direccion) {
+    async function guardarPunto(lat, lng, nombre, direccion, tipo, persona = '') {
       await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}`, {
         method: 'POST',
         headers: {
@@ -164,8 +130,9 @@
             Direccion: direccion,
             Latitud: lat,
             Longitud: lng,
-            CheckIn: false,
-            Persona: ''
+            CheckIn: tipo === 2,
+            Persona: tipo === 2 ? (persona || 'Detectado') : '',
+            Tipo: tipo
           }
         })
       });
@@ -181,13 +148,19 @@
         const f = record.fields;
         if (!(f.Latitud && f.Longitud)) return;
 
-        const marker = L.circleMarker([f.Latitud, f.Longitud], {
-          radius: 12,
-          color: f.CheckIn ? 'green' : 'gray',
-          fillColor: f.CheckIn ? 'green' : '#888',
-          fillOpacity: f.CheckIn ? 0.7 : 0.3,
-          weight: 3
-        }).addTo(map);
+        const marker = f.Tipo === 2
+          ? L.marker([f.Latitud, f.Longitud], {
+              icon: L.divIcon({ html: "🦌", className: '', iconSize: [24, 24] })
+            })
+          : L.circleMarker([f.Latitud, f.Longitud], {
+              radius: 12,
+              color: f.CheckIn ? 'green' : 'gray',
+              fillColor: f.CheckIn ? 'green' : '#888',
+              fillOpacity: f.CheckIn ? 0.7 : 0.3,
+              weight: 3
+            });
+
+        marker.addTo(map);
 
         const popupHTML = `
           <b>${f.Nombre || 'Sin nombre'}</b><br>
@@ -201,6 +174,7 @@
         marker.on('click', async () => {
           map.setView([f.Latitud, f.Longitud], 16);
           marker.openPopup();
+          if (f.Tipo === 2) return;
           if (!f.CheckIn) {
             const p = prompt("Tu nombre para hacer check-in:");
             if (!p) return;
@@ -247,17 +221,11 @@
       );
     }
 
-    // Mostrar/ocultar la barra para introducir coordenadas
     function toggleCoordsInput() {
       const bar = document.getElementById('coords-input-bar');
-      if (bar.style.display === 'none' || bar.style.display === '') {
-        bar.style.display = 'block';
-      } else {
-        bar.style.display = 'none';
-      }
+      bar.style.display = (bar.style.display === 'none' || bar.style.display === '') ? 'block' : 'none';
     }
 
-    // Añadir coordenadas al mapa y guardar en Airtable
     async function añadirCoordenadas() {
       const lat = parseFloat(document.getElementById('lat-input').value);
       const lng = parseFloat(document.getElementById('lng-input').value);
@@ -266,20 +234,19 @@
         alert('Por favor, introduce valores numéricos válidos para latitud y longitud.');
         return;
       }
+      const tipo = confirm("¿Es una ubicación (Aceptar) o un bicho (Cancelar)?") ? 1 : 2;
       const nombre = prompt("Nombre del punto:");
-      if (!nombre) return;
       const direccion = prompt("Dirección:");
-      if (!direccion) return;
+      if (!nombre || !direccion) return;
 
-      await guardarPunto(lat, lng, nombre, direccion);
+      await guardarPunto(lat, lng, nombre, direccion, tipo);
       location.reload();
     }
 
     navigator.geolocation.getCurrentPosition(
       pos => iniciarMapa(pos.coords.latitude, pos.coords.longitude),
-      () => iniciarMapa(40.4168, -3.7038), // fallback a Madrid
+      () => iniciarMapa(40.4168, -3.7038),
       { enableHighAccuracy: true }
     );
-  </script>
-</body>
+  </script></body>
 </html>
