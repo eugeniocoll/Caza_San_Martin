@@ -5,134 +5,73 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Caza San Martin</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-    }
-    h1 {
-      text-align: center;
-      margin: 10px;
-      z-index: 1100;
-      position: relative;
-    }
-    #map {
-      width: 100%;
-      height: 90vh;
-    }
-    .delete-btn {
-      background-color: red;
-      color: white;
-      border: none;
-      padding: 6px 10px;
-      margin-top: 6px;
-      cursor: pointer;
-      border-radius: 4px;
-    }
-    .delete-btn:hover {
-      background-color: darkred;
-    }
-    .gps-button, .search-toggle {
-      position: absolute;
-      z-index: 1000;
-      padding: 10px 12px;
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      cursor: pointer;
+    body { margin: 0; font-family: Arial, sans-serif; }
+    h1 { text-align: center; margin: 10px; position: relative; z-index: 1100; }
+    #map { width: 100%; height: 90vh; }
+    .gps-button {
+      position: absolute; z-index: 1000;
+      bottom: 20px; right: 20px;
+      padding: 10px 12px; background: white; border: 1px solid #ccc;
+      border-radius: 6px; cursor: pointer;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-    .gps-button {
-      bottom: 20px;
-      right: 20px;
-    }
-    .search-toggle {
-      top: 20px;
-      left: 20px;
-    }
-    .leaflet-control-geocoder {
-      display: none;
-      position: absolute;
-      top: 60px;
-      left: 20px;
-      z-index: 1001;
-    }
-    .leaflet-control-geocoder.active {
-      display: block;
+    .delete-btn {
+      background-color: red; color: white; border: none;
+      padding: 6px 10px; margin-top: 6px;
+      cursor: pointer; border-radius: 4px;
     }
   </style>
 </head>
 <body>
   <h1>Caza San Martin</h1>
   <button onclick="centrarEnPosicionActual()" class="gps-button">📍 Mi ubicación</button>
-  <button onclick="toggleSearch()" class="search-toggle">🔍</button>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
   <script>
     const airtableToken = "patiRwUAYSPhDFA6v.4860e76fce11ae963cf71189508da6ff87c3c2a8b82782b802eb20e1f04a2296";
     const baseId = "appo1MtSst3hKF0ky";
     const tableName = "Caza";
 
-    let map;
-    let userMarker;
-    let geocoderControl;
-
-    function toggleSearch() {
-      const el = document.querySelector(".leaflet-control-geocoder");
-      if (el) el.classList.toggle("active");
-    }
+    let map, userMarker;
 
     function iniciarMapa(lat, lng) {
       map = L.map('map').setView([lat, lng], 14);
-
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(map);
 
-      geocoderControl = L.Control.geocoder({
-        defaultMarkGeocode: false
-      })
-      .on('markgeocode', function(e) {
-        const center = e.geocode.center;
-        const nombre = e.geocode.name;
-
-        map.setView(center, 16);
-
-        const marcadorBusqueda = L.marker(center).addTo(map)
-          .bindPopup(`<b>${nombre}</b><br><button onclick="guardarDesdeBusqueda(${center.lat}, ${center.lng}, '${nombre.replace(/'/g, "\\'")}')">📍 Guardar este punto</button>`)
-          .openPopup();
-      })
-      .addTo(map);
-
-      // Oculta el control al cargar
-      document.querySelector(".leaflet-control-geocoder").classList.remove("leaflet-bar");
-      document.querySelector(".leaflet-control-geocoder").classList.remove("active");
-
-      // Marcador usuario
       userMarker = L.circleMarker([lat, lng], {
-        radius: 8,
-        color: 'blue',
-        fillColor: 'blue',
-        fillOpacity: 0.6
+        radius: 8, color: 'blue', fillColor: 'blue', fillOpacity: 0.6
       }).addTo(map).bindTooltip("Estás aquí").openTooltip();
+
+      // Añadir buscador
+      L.Control.geocoder({
+        defaultMarkGeocode: false
+      }).on('markgeocode', function(e) {
+        const center = e.geocode.center;
+        map.setView(center, 16);
+        const crear = confirm("¿Crear una nueva localización aquí?");
+        if (!crear) return;
+        const nombre = prompt("Nombre del punto:");
+        const direccion = prompt("Dirección:");
+        if (!nombre || !direccion) return;
+        guardarPunto(center.lat, center.lng, nombre, direccion).then(() => location.reload());
+      }).addTo(map);
 
       cargarPuntos();
 
       map.on('click', async e => {
         const crear = confirm("¿Crear una nueva localización aquí?");
         if (!crear) return;
-
         const nombre = prompt("Nombre del punto:");
-        const direccion = prompt("Dirección del punto:");
+        const direccion = prompt("Dirección:");
         if (!nombre || !direccion) return;
-
-        const lat = e.latlng.lat;
-        const lng = e.latlng.lng;
-
-        await guardarPunto(lat, lng, nombre, direccion);
+        await guardarPunto(e.latlng.lat, e.latlng.lng, nombre, direccion);
         location.reload();
       });
     }
@@ -157,150 +96,87 @@
       });
     }
 
-    async function guardarDesdeBusqueda(lat, lng, nombre) {
-      const confirmar = confirm(`¿Quieres guardar "${nombre}" como nuevo punto?`);
-      if (!confirmar) return;
-
-      const direccion = prompt("Dirección del punto:", nombre);
-      if (!direccion) return;
-
-      await guardarPunto(lat, lng, nombre, direccion);
-      location.reload();
-    }
-
-    function centrarEnPosicionActual() {
-      if (!navigator.geolocation) {
-        alert("Tu navegador no soporta geolocalización.");
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          map.setView([latitude, longitude], 16);
-
-          if (userMarker) map.removeLayer(userMarker);
-
-          userMarker = L.circleMarker([latitude, longitude], {
-            radius: 8,
-            color: 'blue',
-            fillColor: 'blue',
-            fillOpacity: 0.6
-          }).addTo(map).bindTooltip("Estás aquí").openTooltip();
-        },
-        (error) => {
-          console.error("Error obteniendo ubicación:", error);
-          alert("No se pudo obtener tu ubicación.");
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        }
-      );
-    }
-
     async function cargarPuntos() {
       const url = `https://api.airtable.com/v0/${baseId}/${tableName}`;
       const headers = { Authorization: `Bearer ${airtableToken}` };
+      const res = await fetch(url, { headers });
+      const data = await res.json();
 
-      try {
-        const res = await fetch(url, { headers });
-        const data = await res.json();
+      data.records.forEach(record => {
+        const f = record.fields;
+        if (!(f.Latitud && f.Longitud)) return;
 
-        data.records.forEach(record => {
-          const { Nombre: nombre = 'Sin nombre', Direccion: direccion = 'Sin dirección',
-                  Latitud: lat, Longitud: lng, CheckIn: check = false, Persona: persona = 'Sin persona' } = record.fields;
+        const marker = L.circleMarker([f.Latitud, f.Longitud], {
+          radius: 12,
+          color: f.CheckIn ? 'green' : 'gray',
+          fillColor: f.CheckIn ? 'green' : '#888',
+          fillOpacity: f.CheckIn ? 0.7 : 0.3,
+          weight: 3
+        }).addTo(map);
 
-          if (!(lat && lng)) return;
+        const popupHTML = `
+          <b>${f.Nombre || 'Sin nombre'}</b><br>
+          ${f.Direccion || 'Sin dirección'}<br>
+          <b>Check-in:</b> ${f.CheckIn ? 'Sí' : 'No'}<br>
+          <b>Persona:</b> ${f.Persona || 'Nadie'}<br>
+          <button class="delete-btn" onclick="eliminarPunto('${record.id}')">Eliminar</button>
+        `;
 
-          const marker = L.circleMarker([lat, lng], {
-            radius: 12,
-            color: check ? 'green' : 'gray',
-            fillColor: check ? 'green' : '#888',
-            fillOpacity: check ? 0.7 : 0.3,
-            weight: 3
-          }).addTo(map);
-
-          const popupHTML = () => `
-            <b>${nombre}</b><br>
-            ${direccion}<br>
-            <b>Check-in:</b> ${check ? 'Sí' : 'No'}<br>
-            <b>Persona:</b> ${persona}<br>
-            <button class="delete-btn" onclick="eliminarPunto('${record.id}')">Eliminar</button>
-          `;
-          marker.bindPopup(popupHTML(), { autoClose: false, closeOnClick: false });
-          marker.bindTooltip(`<b>${nombre}</b><br>${direccion}`, { sticky: true });
-
-          marker.on('mouseover', () => marker.openPopup());
-          marker.on('mouseout', () => {
-            if (!marker.getPopup()._isOpen) marker.closePopup();
-          });
-
-          marker.on('click', async () => {
-            map.setView([lat, lng], 16);
-            marker.openPopup();
-
-            if (!check) {
-              const p = prompt("Ingresa tu nombre para el check-in:");
-              if (!p) return;
-
-              await fetch(`${url}/${record.id}`, {
-                method: 'PATCH',
-                headers: {
-                  'Authorization': `Bearer ${airtableToken}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ fields: { CheckIn: true, Persona: p } })
-              });
-            } else {
-              if (!confirm("¿Eliminar check-in?")) return;
-
-              await fetch(`${url}/${record.id}`, {
-                method: 'PATCH',
-                headers: {
-                  'Authorization': `Bearer ${airtableToken}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ fields: { CheckIn: false, Persona: '' } })
-              });
-            }
-
-            location.reload();
-          });
+        marker.bindPopup(popupHTML, { autoClose: false, closeOnClick: false });
+        marker.on('click', async () => {
+          map.setView([f.Latitud, f.Longitud], 16);
+          marker.openPopup();
+          if (!f.CheckIn) {
+            const p = prompt("Tu nombre para hacer check-in:");
+            if (!p) return;
+            await fetch(`${url}/${record.id}`, {
+              method: 'PATCH',
+              headers: { Authorization: `Bearer ${airtableToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fields: { CheckIn: true, Persona: p } })
+            });
+          } else {
+            if (!confirm("¿Eliminar check-in?")) return;
+            await fetch(`${url}/${record.id}`, {
+              method: 'PATCH',
+              headers: { Authorization: `Bearer ${airtableToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fields: { CheckIn: false, Persona: '' } })
+            });
+          }
+          location.reload();
         });
-      } catch (e) {
-        console.error("Error cargando puntos:", e);
-      }
+      });
     }
 
-    window.eliminarPunto = async function(id) {
-      if (!confirm("¿Eliminar este punto?")) return;
-
-      await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}/${id}`, {
+    function eliminarPunto(id) {
+      if (!confirm("¿Estás seguro de eliminar este punto?")) return;
+      fetch(`https://api.airtable.com/v0/${baseId}/${tableName}/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${airtableToken}` }
-      });
-
-      location.reload();
-    };
-
-    window.onload = () => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          iniciarMapa(position.coords.latitude, position.coords.longitude);
-        },
-        (error) => {
-          console.warn("No se pudo obtener ubicación, usando vista por defecto");
-          iniciarMapa(39.5696, 2.6502); // Palma de Mallorca por defecto
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0
+        headers: {
+          Authorization: `Bearer ${airtableToken}`
         }
+      }).then(() => location.reload());
+    }
+
+    function centrarEnPosicionActual() {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          map.setView([latitude, longitude], 16);
+          if (userMarker) map.removeLayer(userMarker);
+          userMarker = L.circleMarker([latitude, longitude], {
+            radius: 8, color: 'blue', fillColor: 'blue', fillOpacity: 0.6
+          }).addTo(map).bindTooltip("Estás aquí").openTooltip();
+        },
+        () => alert("No se pudo obtener tu ubicación."),
+        { enableHighAccuracy: true }
       );
-    };
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => iniciarMapa(pos.coords.latitude, pos.coords.longitude),
+      () => iniciarMapa(40.4168, -3.7038), // fallback a Madrid
+      { enableHighAccuracy: true }
+    );
   </script>
 </body>
 </html>
