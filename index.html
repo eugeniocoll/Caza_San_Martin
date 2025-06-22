@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Caza San Martin</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
   <style>
     body {
       margin: 0;
@@ -32,10 +33,8 @@
     .delete-btn:hover {
       background-color: darkred;
     }
-    .gps-button {
+    .gps-button, .search-toggle {
       position: absolute;
-      bottom: 20px;
-      right: 20px;
       z-index: 1000;
       padding: 10px 12px;
       background: white;
@@ -44,14 +43,34 @@
       cursor: pointer;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
+    .gps-button {
+      bottom: 20px;
+      right: 20px;
+    }
+    .search-toggle {
+      top: 20px;
+      left: 20px;
+    }
+    .leaflet-control-geocoder {
+      display: none;
+      position: absolute;
+      top: 60px;
+      left: 20px;
+      z-index: 1001;
+    }
+    .leaflet-control-geocoder.active {
+      display: block;
+    }
   </style>
 </head>
 <body>
   <h1>Caza San Martin</h1>
   <button onclick="centrarEnPosicionActual()" class="gps-button">📍 Mi ubicación</button>
+  <button onclick="toggleSearch()" class="search-toggle">🔍</button>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
   <script>
     const airtableToken = "patiRwUAYSPhDFA6v.4860e76fce11ae963cf71189508da6ff87c3c2a8b82782b802eb20e1f04a2296";
     const baseId = "appo1MtSst3hKF0ky";
@@ -59,6 +78,12 @@
 
     let map;
     let userMarker;
+    let geocoderControl;
+
+    function toggleSearch() {
+      const el = document.querySelector(".leaflet-control-geocoder");
+      if (el) el.classList.toggle("active");
+    }
 
     function iniciarMapa(lat, lng) {
       map = L.map('map').setView([lat, lng], 14);
@@ -67,7 +92,26 @@
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(map);
 
-      // Guardamos el marcador de usuario en userMarker
+      geocoderControl = L.Control.geocoder({
+        defaultMarkGeocode: false
+      })
+      .on('markgeocode', function(e) {
+        const center = e.geocode.center;
+        const nombre = e.geocode.name;
+
+        map.setView(center, 16);
+
+        const marcadorBusqueda = L.marker(center).addTo(map)
+          .bindPopup(`<b>${nombre}</b><br><button onclick="guardarDesdeBusqueda(${center.lat}, ${center.lng}, '${nombre.replace(/'/g, "\\'")}')">📍 Guardar este punto</button>`)
+          .openPopup();
+      })
+      .addTo(map);
+
+      // Oculta el control al cargar
+      document.querySelector(".leaflet-control-geocoder").classList.remove("leaflet-bar");
+      document.querySelector(".leaflet-control-geocoder").classList.remove("active");
+
+      // Marcador usuario
       userMarker = L.circleMarker([lat, lng], {
         radius: 8,
         color: 'blue',
@@ -88,26 +132,40 @@
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
 
-        await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${airtableToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            fields: {
-              Nombre: nombre,
-              Direccion: direccion,
-              Latitud: lat,
-              Longitud: lng,
-              CheckIn: false,
-              Persona: ''
-            }
-          })
-        });
-
+        await guardarPunto(lat, lng, nombre, direccion);
         location.reload();
       });
+    }
+
+    async function guardarPunto(lat, lng, nombre, direccion) {
+      await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${airtableToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fields: {
+            Nombre: nombre,
+            Direccion: direccion,
+            Latitud: lat,
+            Longitud: lng,
+            CheckIn: false,
+            Persona: ''
+          }
+        })
+      });
+    }
+
+    async function guardarDesdeBusqueda(lat, lng, nombre) {
+      const confirmar = confirm(`¿Quieres guardar "${nombre}" como nuevo punto?`);
+      if (!confirmar) return;
+
+      const direccion = prompt("Dirección del punto:", nombre);
+      if (!direccion) return;
+
+      await guardarPunto(lat, lng, nombre, direccion);
+      location.reload();
     }
 
     function centrarEnPosicionActual() {
@@ -121,10 +179,8 @@
           const { latitude, longitude } = position.coords;
           map.setView([latitude, longitude], 16);
 
-          // Eliminar el marcador anterior si existe
           if (userMarker) map.removeLayer(userMarker);
 
-          // Crear un nuevo marcador y actualizar userMarker
           userMarker = L.circleMarker([latitude, longitude], {
             radius: 8,
             color: 'blue',
@@ -171,19 +227,14 @@
             ${direccion}<br>
             <b>Check-in:</b> ${check ? 'Sí' : 'No'}<br>
             <b>Persona:</b> ${persona}<br>
-            <button class="delete-btn" onclick="eliminarPunto('${record.id}', ${lat}, ${lng})">Eliminar</button>
+            <button class="delete-btn" onclick="eliminarPunto('${record.id}')">Eliminar</button>
           `;
           marker.bindPopup(popupHTML(), { autoClose: false, closeOnClick: false });
           marker.bindTooltip(`<b>${nombre}</b><br>${direccion}`, { sticky: true });
 
-          marker.on('mouseover', () => {
-            marker.openPopup();
-          });
-
+          marker.on('mouseover', () => marker.openPopup());
           marker.on('mouseout', () => {
-            if (!marker.getPopup()._isOpen) {
-              marker.closePopup();
-            }
+            if (!marker.getPopup()._isOpen) marker.closePopup();
           });
 
           marker.on('click', async () => {
@@ -234,7 +285,6 @@
       location.reload();
     };
 
-    // Iniciar el mapa directamente con la ubicación actual del usuario
     window.onload = () => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
