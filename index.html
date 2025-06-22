@@ -13,6 +13,8 @@
     h1 {
       text-align: center;
       margin: 10px;
+      z-index: 1100;
+      position: relative;
     }
     #map {
       width: 100%;
@@ -32,14 +34,15 @@
     }
     .gps-button {
       position: absolute;
-      top: 10px;
-      left: 10px;
+      bottom: 20px;
+      right: 20px;
       z-index: 1000;
-      padding: 10px;
+      padding: 10px 12px;
       background: white;
       border: 1px solid #ccc;
       border-radius: 6px;
       cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
   </style>
 </head>
@@ -54,12 +57,89 @@
     const baseId = "appo1MtSst3hKF0ky";
     const tableName = "Caza";
 
-    const savedView = JSON.parse(localStorage.getItem('ultimaVistaMapa'));
-    const map = L.map('map').setView(savedView || [39.5696, 2.6502], 13);
+    let map;
+    let userMarker;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    function iniciarMapa(lat, lng) {
+      map = L.map('map').setView([lat, lng], 14);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      L.circleMarker([lat, lng], {
+        radius: 8,
+        color: 'blue',
+        fillColor: 'blue',
+        fillOpacity: 0.6
+      }).addTo(map).bindTooltip("Estás aquí").openTooltip();
+
+      cargarPuntos();
+
+      map.on('click', async e => {
+        const crear = confirm("¿Crear una nueva localización aquí?");
+        if (!crear) return;
+
+        const nombre = prompt("Nombre del punto:");
+        const direccion = prompt("Dirección del punto:");
+        if (!nombre || !direccion) return;
+
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+
+        await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${airtableToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            fields: {
+              Nombre: nombre,
+              Direccion: direccion,
+              Latitud: lat,
+              Longitud: lng,
+              CheckIn: false,
+              Persona: ''
+            }
+          })
+        });
+
+        location.reload();
+      });
+    }
+
+    function centrarEnPosicionActual() {
+      if (!navigator.geolocation) {
+        alert("Tu navegador no soporta geolocalización.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          map.setView([latitude, longitude], 16);
+
+          if (userMarker) map.removeLayer(userMarker);
+
+          userMarker = L.circleMarker([latitude, longitude], {
+            radius: 8,
+            color: 'blue',
+            fillColor: 'blue',
+            fillOpacity: 0.6
+          }).addTo(map).bindTooltip("Estás aquí").openTooltip();
+        },
+        (error) => {
+          console.error("Error obteniendo ubicación:", error);
+          alert("No se pudo obtener tu ubicación.");
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    }
 
     async function cargarPuntos() {
       const url = `https://api.airtable.com/v0/${baseId}/${tableName}`;
@@ -95,7 +175,6 @@
 
           marker.on('mouseover', () => {
             marker.openPopup();
-            guardarVista(lat, lng);
           });
 
           marker.on('mouseout', () => {
@@ -133,7 +212,6 @@
               });
             }
 
-            guardarVista(lat, lng);
             location.reload();
           });
         });
@@ -142,7 +220,7 @@
       }
     }
 
-    window.eliminarPunto = async function(id, lat, lng) {
+    window.eliminarPunto = async function(id) {
       if (!confirm("¿Eliminar este punto?")) return;
 
       await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}/${id}`, {
@@ -150,77 +228,26 @@
         headers: { Authorization: `Bearer ${airtableToken}` }
       });
 
-      guardarVista(lat, lng);
       location.reload();
     };
 
-    map.on('click', async e => {
-      const crear = confirm("¿Crear una nueva localización aquí?");
-      if (!crear) return;
-
-      const nombre = prompt("Nombre del punto:");
-      const direccion = prompt("Dirección del punto:");
-      if (!nombre || !direccion) return;
-
-      const lat = e.latlng.lat;
-      const lng = e.latlng.lng;
-
-      await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${airtableToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fields: {
-            Nombre: nombre,
-            Direccion: direccion,
-            Latitud: lat,
-            Longitud: lng,
-            CheckIn: false,
-            Persona: ''
-          }
-        })
-      });
-
-      guardarVista(lat, lng);
-      location.reload();
-    });
-
-    function guardarVista(lat, lng) {
-      localStorage.setItem('ultimaVistaMapa', JSON.stringify([lat, lng]));
-    }
-
-    function centrarEnPosicionActual() {
-      if (!navigator.geolocation) {
-        alert("Tu navegador no soporta geolocalización.");
-        return;
-      }
-
+    // Iniciar el mapa directamente con la ubicación actual del usuario
+    window.onload = () => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const { latitude, longitude } = position.coords;
-          map.setView([latitude, longitude], 16);
-          L.circleMarker([latitude, longitude], {
-            radius: 10,
-            color: 'blue',
-            fillColor: 'blue',
-            fillOpacity: 0.5
-          }).addTo(map).bindTooltip("Estás aquí").openTooltip();
+          iniciarMapa(position.coords.latitude, position.coords.longitude);
         },
         (error) => {
-          console.error("Error obteniendo ubicación:", error);
-          alert("No se pudo obtener tu ubicación.");
+          console.warn("No se pudo obtener ubicación, usando vista por defecto");
+          iniciarMapa(39.5696, 2.6502); // Palma de Mallorca por defecto
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 5000,
           maximumAge: 0
         }
       );
-    }
-
-    cargarPuntos();
+    };
   </script>
 </body>
 </html>
